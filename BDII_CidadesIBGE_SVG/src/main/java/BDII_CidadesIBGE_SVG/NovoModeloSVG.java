@@ -13,15 +13,13 @@ import java.io.PrintWriter;
 public class NovoModeloSVG {
     
     public static File novoModelo;
-    private static int cont;
-    public static int incremento;
             
     public NovoModeloSVG() throws IOException{
-        this.incremento = cont++;
-        NovoModeloSVG.novoModelo = new File("NovoModelo"+incremento+".svg");
-        if(!novoModelo.exists()){
+        NovoModeloSVG.novoModelo = new File("NovoModelo.svg");
+        if(novoModelo.exists()){
+            novoModelo.delete();
             novoModelo.createNewFile();
-        }
+        } else novoModelo.createNewFile();
     }
     
     public boolean writeFile(StringBuilder fileModified) throws IOException{

@@ -1,6 +1,6 @@
-
 package BDII_CidadesIBGE_SVG;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -13,22 +13,21 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
 import org.apache.batik.transcoder.TranscoderException;
 import org.apache.batik.transcoder.TranscoderInput;
 import org.apache.batik.transcoder.TranscoderOutput;
 import org.apache.batik.transcoder.image.JPEGTranscoder;
 
-
-public class BuscaSVGTranscode extends javax.swing.JFrame {
+public class TelaPrincipal extends javax.swing.JFrame {
 
     /**
      * Creates new form InterfaceGrafica
      */
-    public BuscaSVGTranscode() {
+    public TelaPrincipal() {
         initComponents();
     }
 
@@ -131,46 +130,47 @@ public class BuscaSVGTranscode extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void botaoBuscarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_botaoBuscarActionPerformed
-        
+
         campoSaidaImagem.setIcon(null);
-        
+
         try {
             NovoModeloSVG nmsvg = new NovoModeloSVG();
             ModeloSVG msvg = new ModeloSVG();
-     
+
             String modelo = msvg.readFile();
-            String nomeArquivo = "NovoModelo"+NovoModeloSVG.incremento;
-            
-            nmsvg.writeFile(addParametrosModelo(modelo));
-            
-            createJPG(nomeArquivo);
-            
-            Icon icon = new ImageIcon(nomeArquivo+".jpg");
+
+            nmsvg.writeFile(setParametrosModelo(modelo));
+
+            createJPG();
+
+            Icon icon = new ImageIcon(readAgainIcon());
             campoSaidaImagem.setIcon(icon);
-            
-        } catch (IOException | ClassNotFoundException | SQLException | TranscoderException ex) {
-            Logger.getLogger(BuscaSVGTranscode.class.getName()).log(Level.SEVERE, null, ex);
+
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(null, "Falha na conexão com o arquivo!");
+        } catch (ClassNotFoundException | SQLException ex) {
+            JOptionPane.showMessageDialog(null, "Falha na conexão com o banco!");
+        } catch (TranscoderException ex) {
+            JOptionPane.showMessageDialog(null, "Falha na criação da imagem.jpg!");
         }
-        
-        
-        
+
     }//GEN-LAST:event_botaoBuscarActionPerformed
 
     private void campoCidadeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_campoCidadeActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_campoCidadeActionPerformed
 
-    public String pesquisaSVGGeom(String cidade) throws ClassNotFoundException, SQLException{
+    public String getSVGGeom(String cidade) throws ClassNotFoundException, SQLException {
         Connection conn = ConFactory.getConnection();
-        
+
         PreparedStatement stmt = conn.prepareStatement("SELECT st_asSVG(geom) from municipio where nome ilike ?");
         stmt.setString(1, cidade);
-        
+
         ResultSet rs = stmt.executeQuery();
-        
+
         if (rs.next()) {
             String retorno = rs.getString("ST_asSVG");
-            
+
             stmt.close();
             conn.close();
             return retorno;
@@ -180,45 +180,53 @@ public class BuscaSVGTranscode extends javax.swing.JFrame {
             return null;
         }
     }
-    
-    public String pesquisaViewBoxGeom(String cidade) throws ClassNotFoundException, SQLException{
-       
-        Connection conn = ConFactory.getConnection();
-       
-       String sql = "{? = call getTamanhoViewBox(?)}";
-       
-       CallableStatement cstmt = conn.prepareCall(sql);
-       cstmt.registerOutParameter(1, java.sql.Types.VARCHAR);
-       cstmt.setString(2, cidade);
-       cstmt.execute();
-       
-       return cstmt.getString(1);
+
+    public BufferedImage readAgainIcon() throws IOException {
+        BufferedImage imagem = ImageIO.read(new File("NovoModelo.jpg"));
+        return imagem;
     }
-    
-    public StringBuilder addParametrosModelo(String modelo) throws ClassNotFoundException, SQLException{
-        
-        StringBuilder stringBuilder = new StringBuilder(modelo); 
-        
-        int localInsertD = modelo.indexOf("d=\"\"")+3;
-        stringBuilder.insert(localInsertD, pesquisaSVGGeom(campoCidade.getText()));
-        
-        int localInsertViewBox = modelo.indexOf("viewBox=\"\"")+9;
-        stringBuilder.insert(localInsertViewBox, pesquisaViewBoxGeom(campoCidade.getText()));
-        
+
+    public String getViewBoxGeom(String cidade) throws ClassNotFoundException, SQLException {
+
+        Connection conn = ConFactory.getConnection();
+
+        String sql = "{? = call getTamanhoViewBox(?)}";
+
+        CallableStatement cstmt = conn.prepareCall(sql);
+        cstmt.registerOutParameter(1, java.sql.Types.VARCHAR);
+        cstmt.setString(2, cidade);
+        cstmt.execute();
+
+        return cstmt.getString(1);
+    }
+
+    public StringBuilder setParametrosModelo(String modelo) throws ClassNotFoundException, SQLException {
+
+        StringBuilder stringBuilder = new StringBuilder(modelo);
+
+        int localInsertD = modelo.indexOf("d=\"\"") + 3;
+        stringBuilder.insert(localInsertD, getSVGGeom(campoCidade.getText()));
+
+        int localInsertViewBox = modelo.indexOf("viewBox=\"\"") + 9;
+        stringBuilder.insert(localInsertViewBox, getViewBoxGeom(campoCidade.getText()));
+
         return stringBuilder;
     }
-    
-    public void createJPG(String nomeArquivo) throws MalformedURLException, FileNotFoundException, TranscoderException, IOException{
-        
+
+    public void createJPG() throws MalformedURLException, FileNotFoundException, TranscoderException, IOException {
+        File arq = new File("NovoModelo.jpg");
+        if (arq.exists()) {
+            arq.delete();
+        }
         JPEGTranscoder transcoder = new JPEGTranscoder();
-        transcoder.addTranscodingHint(JPEGTranscoder.KEY_QUALITY,new Float(1.0));
-        TranscoderInput input = new TranscoderInput(new FileInputStream(nomeArquivo+".svg"));   
-        OutputStream ostream = new FileOutputStream(nomeArquivo+".jpg");
-        TranscoderOutput output = new TranscoderOutput(ostream);    
+        transcoder.addTranscodingHint(JPEGTranscoder.KEY_QUALITY, new Float(1.0));
+        TranscoderInput input = new TranscoderInput(new FileInputStream("NovoModelo.svg"));
+        OutputStream ostream = new FileOutputStream("NovoModelo.jpg");
+        TranscoderOutput output = new TranscoderOutput(ostream);
         transcoder.transcode(input, output);
-        ostream.close(); 
+        ostream.close();
     }
-    
+
     /**
      * @param args the command line arguments
      */
@@ -227,7 +235,7 @@ public class BuscaSVGTranscode extends javax.swing.JFrame {
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new BuscaSVGTranscode().setVisible(true);
+                new TelaPrincipal().setVisible(true);
             }
         });
     }
